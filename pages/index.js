@@ -1,65 +1,83 @@
-import Head from 'next/head'
-import styles from '../styles/Home.module.css'
+import React from 'react';
+import { Line } from 'react-chartjs-2';
+import AWS, { TimestreamQuery } from 'aws-sdk'
 
-export default function Home() {
+const colors = ['red', 'blue', 'green', 'orange', 'purple', 'yellow']
+
+function Graph( { graphData } ) {
+  const datasets = Object.keys(graphData.data).map((key, index) => {
+    return {
+      label: key,
+      fill: false,
+      showLine: true,
+      lineTension: 0,
+      borderColor: colors[index % colors.length],
+      data: graphData.data[key]
+    }
+  })
+
+  const data = {
+    labels: ['Line'],
+    datasets: datasets
+  };  
+
   return (
-    <div className={styles.container}>
-      <Head>
-        <title>Create Next App</title>
-        <link rel="icon" href="/favicon.ico" />
-      </Head>
-
-      <main className={styles.main}>
-        <h1 className={styles.title}>
-          Welcome to <a href="https://nextjs.org">Next.js!</a>
-        </h1>
-
-        <p className={styles.description}>
-          Get started by editing{' '}
-          <code className={styles.code}>pages/index.js</code>
-        </p>
-
-        <div className={styles.grid}>
-          <a href="https://nextjs.org/docs" className={styles.card}>
-            <h3>Documentation &rarr;</h3>
-            <p>Find in-depth information about Next.js features and API.</p>
-          </a>
-
-          <a href="https://nextjs.org/learn" className={styles.card}>
-            <h3>Learn &rarr;</h3>
-            <p>Learn about Next.js in an interactive course with quizzes!</p>
-          </a>
-
-          <a
-            href="https://github.com/vercel/next.js/tree/master/examples"
-            className={styles.card}
-          >
-            <h3>Examples &rarr;</h3>
-            <p>Discover and deploy boilerplate example Next.js projects.</p>
-          </a>
-
-          <a
-            href="https://vercel.com/import?filter=next.js&utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-          >
-            <h3>Deploy &rarr;</h3>
-            <p>
-              Instantly deploy your Next.js site to a public URL with Vercel.
-            </p>
-          </a>
-        </div>
-      </main>
-
-      <footer className={styles.footer}>
-        <a
-          href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Powered by{' '}
-          <img src="/vercel.svg" alt="Vercel Logo" className={styles.logo} />
-        </a>
-      </footer>
+    <div>
+      <div>グラフ {graphData.time.build}</div>
+      <Line
+        data={data}
+        width={400}
+        height={100}
+        options={{
+          animation: false,
+          scales: { xAxes: [{
+            type: "time",
+            distribution: "linear",
+            ticks: {
+              min: graphData.time.min,
+              max: graphData.time.max
+            }
+          }]},
+        }}
+      />
     </div>
+  );
+};
+
+export async function getStaticProps() {
+  const client = new AWS.TimestreamQuery({
+    region: "us-east-1"
+  });
+
+  const params = {
+    QueryString: 'select measure_name, time, measure_value::double from "soracom"."gpsmultiunit" where time > ago(60m) order by time asc'
+  }
+
+  var i = 0;
+  const graphData = { time: { build: new Date().toString()}, data: {}};
+  await client.query(params).promise()
+  .then(
+    (response) => {
+      response.Rows.forEach(row => {
+        if (!graphData.data.hasOwnProperty(row.Data[0].ScalarValue)){
+          graphData.data[row.Data[0].ScalarValue] = []
+        }
+        graphData.data[row.Data[0].ScalarValue].push({x: row.Data[1].ScalarValue, y: row.Data[2].ScalarValue})
+      })
+      graphData.time.min = response.Rows[0].Data[1].ScalarValue
+      graphData.time.max = response.Rows[response.Rows.length - 1].Data[1].ScalarValue
+    },
+    (err) => {
+      console.error("Error while querying: ", err);
+    }
   )
+
+  return {
+    props: {
+      graphData
+    },
+    revalidate: 60
+  }
 }
+
+export default Graph
