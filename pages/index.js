@@ -46,7 +46,11 @@ function Graph( { graphData } ) {
 
 export async function getStaticProps() {
   const client = new AWS.TimestreamQuery({
-    region: "us-east-1"
+    region: "us-east-1",
+    credentials: {
+      accessKeyId: process.env.ACCESS_KEY_ID,
+      secretAccessKey: process.env.SECRET_ACCESS_KEY
+    }
   });
 
   const params = {
