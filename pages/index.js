@@ -44,7 +44,7 @@ function Graph( { graphData } ) {
   );
 };
 
-export async function getServerSideProps() {
+export async function getStaticProps() {
   const client = new AWS.TimestreamQuery({
     region: "us-east-1",
     credentials: {
@@ -78,7 +78,8 @@ export async function getServerSideProps() {
   return {
     props: {
       graphData
-    }
+    },
+    revalidate: 60
   }
 }
 
