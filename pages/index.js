@@ -1,6 +1,6 @@
 import React from 'react';
 import { Line } from 'react-chartjs-2';
-import AWS, { TimestreamQuery } from 'aws-sdk'
+import AWS from 'aws-sdk'
 
 const colors = ['red', 'blue', 'green', 'orange', 'purple', 'yellow']
 
@@ -44,7 +44,7 @@ function Graph( { graphData } ) {
   );
 };
 
-export async function getStaticProps() {
+export async function getServerSideProps() {
   const client = new AWS.TimestreamQuery({
     region: "us-east-1",
     credentials: {
@@ -57,7 +57,6 @@ export async function getStaticProps() {
     QueryString: 'select measure_name, time, measure_value::double from "soracom"."gpsmultiunit" where time > ago(60m) order by time asc'
   }
 
-  var i = 0;
   const graphData = { time: { build: new Date().toString()}, data: {}};
   await client.query(params).promise()
   .then(
@@ -79,8 +78,7 @@ export async function getStaticProps() {
   return {
     props: {
       graphData
-    },
-    revalidate: 60
+    }
   }
 }
 
